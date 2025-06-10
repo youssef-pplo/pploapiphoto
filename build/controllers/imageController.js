@@ -12,36 +12,39 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getImages = exports.handleResizeRequest = void 0;
+exports.handleUpload = exports.getImages = exports.handleResizeRequest = void 0;
 const fs_1 = require("fs");
 const path_1 = __importDefault(require("path"));
 const sharp_1 = __importDefault(require("sharp"));
-// LOGIC TO RESIZE AN IMAGE WITH CACHING
-const resizeImage = (filename, width, height) => __awaiter(void 0, void 0, void 0, function* () {
-    const originalImagePath = path_1.default.resolve(__dirname, `../../public/images/${filename}`);
-    const thumbDirectory = path_1.default.resolve(__dirname, '../../public/images/thumbnails');
-    const baseFilename = path_1.default.parse(filename).name;
-    const thumbPath = path_1.default.join(thumbDirectory, `${baseFilename}-${width}x${height}.jpg`);
-    // --- DEBUG MESSAGES ADDED BELOW ---
-    console.log(`[DEBUG] Checking for cached file at: ${thumbPath}`);
+const IMAGES_DIR_ORIGINAL = path_1.default.resolve(__dirname, '../../public/images');
+const IMAGES_DIR_THUMB = path_1.default.resolve(__dirname, '../../public/images/thumbnails');
+const ensureDirExists = (dirPath) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield fs_1.promises.access(thumbPath);
-        console.log('[DEBUG] CACHE HIT! Found existing file.');
-        return `/images/thumbnails/${baseFilename}-${width}x${height}.jpg`;
+        yield fs_1.promises.access(dirPath);
     }
     catch (_a) {
-        console.log('[DEBUG] CACHE MISS. Creating new file...');
+        yield fs_1.promises.mkdir(dirPath, { recursive: true });
+    }
+});
+const resizeImage = (filename, width, height) => __awaiter(void 0, void 0, void 0, function* () {
+    const originalImagePath = path_1.default.join(IMAGES_DIR_ORIGINAL, filename);
+    const thumbPath = path_1.default.join(IMAGES_DIR_THUMB, `${path_1.default.parse(filename).name}-${width}x${height}.jpg`);
+    try {
+        yield fs_1.promises.access(thumbPath);
+        return `/images/thumbnails/${path_1.default.basename(thumbPath)}`;
+    }
+    catch (_a) {
         try {
+            yield ensureDirExists(IMAGES_DIR_THUMB);
             yield (0, sharp_1.default)(originalImagePath).resize(width, height).toFile(thumbPath);
-            return `/images/thumbnails/${baseFilename}-${width}x${height}.jpg`;
+            return `/images/thumbnails/${path_1.default.basename(thumbPath)}`;
         }
-        catch (resizeError) {
-            console.log('[DEBUG] Error during image resize:', resizeError);
-            throw new Error('Image could not be processed or the original file does not exist.');
+        catch ( // ✅ THE FIX IS HERE: The unused 'resizeError' variable is removed.
+        _b) { // ✅ THE FIX IS HERE: The unused 'resizeError' variable is removed.
+            throw new Error('Image could not be processed. The original file may not exist.');
         }
     }
 });
-// CONTROLLER TO HANDLE THE /resize REQUEST
 const handleResizeRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { filename, width, height } = req.query;
     if (!filename || !width || !height) {
@@ -63,12 +66,17 @@ const handleResizeRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
     }
 });
 exports.handleResizeRequest = handleResizeRequest;
-// CONTROLLER TO GET THE LIST OF AVAILABLE IMAGES
 const getImages = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const imagesDirectory = path_1.default.resolve(__dirname, '../../public/images');
     try {
-        const files = yield fs_1.promises.readdir(imagesDirectory);
-        const imageFiles = files.filter((file) => file.endsWith('.jpg') || file.endsWith('.jpeg'));
+        yield ensureDirExists(IMAGES_DIR_ORIGINAL);
+        const filesAndFolders = yield fs_1.promises.readdir(IMAGES_DIR_ORIGINAL);
+        const imageFiles = [];
+        for (const file of filesAndFolders) {
+            const stats = yield fs_1.promises.stat(path_1.default.join(IMAGES_DIR_ORIGINAL, file));
+            if (stats.isFile() && /\.(jpg|jpeg|png)$/i.test(file)) {
+                imageFiles.push(file);
+            }
+        }
         res.json(imageFiles);
     }
     catch (_a) {
@@ -76,3 +84,14 @@ const getImages = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.getImages = getImages;
+const handleUpload = (req, res) => {
+    if (!req.file) {
+        res.status(400).json({ error: 'File not provided or was filtered.' });
+        return;
+    }
+    res.status(200).json({
+        message: 'Image uploaded successfully!',
+        filename: req.file.filename
+    });
+};
+exports.handleUpload = handleUpload;

@@ -17,6 +17,7 @@ app.get('/', (req, res) => {
     res.sendFile(path_1.default.join(__dirname, '../public/index.html'));
 });
 app.listen(port, () => {
-    console.log(`Server is running at http://localhost:${port}`);
+    // The console.log message is removed to satisfy the linter.
+    // The server will still run correctly.
 });
 exports.default = app;

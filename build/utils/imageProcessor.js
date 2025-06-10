@@ -17,18 +17,26 @@ const sharp_1 = __importDefault(require("sharp"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const resizeImage = (filename, width, height) => __awaiter(void 0, void 0, void 0, function* () {
-    const inputPath = path_1.default.resolve('public/full', `${filename}.jpg`);
-    const outputDir = path_1.default.resolve('public/thumb');
-    const outputPath = path_1.default.resolve(outputDir, `${filename}_${width}x${height}.jpg`);
-    // Make sure output folder exists
-    if (!fs_1.default.existsSync(outputDir)) {
-        fs_1.default.mkdirSync(outputDir);
+    const originalImagePath = path_1.default.resolve(__dirname, `../../public/images/${filename}`);
+    const thumbDirectory = path_1.default.resolve(__dirname, '../../public/images/thumbnails');
+    const baseFilename = path_1.default.parse(filename).name;
+    const thumbPath = path_1.default.join(thumbDirectory, `${baseFilename}-${width}x${height}.jpg`);
+    try {
+        yield fs_1.default.promises.access(thumbPath);
+        return thumbPath;
     }
-    // If already exists, return the path (for caching)
-    if (fs_1.default.existsSync(outputPath)) {
-        return outputPath;
+    catch (_a) {
+        try {
+            if (!fs_1.default.existsSync(thumbDirectory)) {
+                yield fs_1.default.promises.mkdir(thumbDirectory, { recursive: true });
+            }
+            yield (0, sharp_1.default)(originalImagePath).resize(width, height).toFile(thumbPath);
+            return thumbPath;
+        }
+        catch ( // ✅ THE FIX IS HERE: The unused '_resizeError' variable is removed.
+        _b) { // ✅ THE FIX IS HERE: The unused '_resizeError' variable is removed.
+            throw new Error('Image could not be processed or the original file does not exist.');
+        }
     }
-    yield (0, sharp_1.default)(inputPath).resize(width, height).toFile(outputPath);
-    return outputPath;
 });
 exports.resizeImage = resizeImage;

@@ -37,24 +37,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const uploadMiddleware_1 = __importDefault(require("../middleware/uploadMiddleware")); // Assuming you have this middleware
+const uploadMiddleware_1 = __importDefault(require("../middleware/uploadMiddleware"));
 const imageController = __importStar(require("../controllers/imageController"));
 const router = express_1.default.Router();
-// GET /api/images/ - Lists available images
+// This route is correct
 router.get('/', imageController.getImages);
-// GET /api/images/resize - Resizes an image
+// This route is correct
 router.get('/resize', imageController.handleResizeRequest);
 // POST /api/images/upload - Uploads a new image
-router.post('/upload', uploadMiddleware_1.default.single('image'), (req, res) => {
-    if (!req.file) {
-        // Send the error response
-        res.status(400).json({ error: 'No file uploaded or file type not allowed.' });
-        // Exit the function with a void return
-        return;
-    }
-    res.json({
-        message: 'File uploaded successfully',
-        filename: req.file.filename
-    });
-});
+// ✅ THIS IS THE CORRECTED LINE
+// We now use uploadMiddleware.single('image') and imageController.handleUpload
+router.post('/upload', uploadMiddleware_1.default.single('image'), imageController.handleUpload);
 exports.default = router;
