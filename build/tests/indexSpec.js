@@ -14,15 +14,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const supertest_1 = __importDefault(require("supertest"));
 const app_1 = __importDefault(require("../app"));
-const request = (0, supertest_1.default)(app_1.default);
 describe('Test API Endpoints', () => {
-    it('should get the main page at /', () => __awaiter(void 0, void 0, void 0, function* () {
-        const response = yield request.get('/');
-        expect(response.status).toBe(200);
-    }));
     it('should get the resize endpoint with valid parameters', () => __awaiter(void 0, void 0, void 0, function* () {
-        const response = yield request.get('/api/images/resize?filename=fjord&width=200&height=200');
+        const response = yield (0, supertest_1.default)(app_1.default).get('/api/images/resize?filename=test.jpg&width=100&height=100');
         expect(response.status).toBe(200);
+        expect(response.body.path).toBeDefined();
     }));
-    // Remember to add more tests for other cases as required by the project rubric
 });

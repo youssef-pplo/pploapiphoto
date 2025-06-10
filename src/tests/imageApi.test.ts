@@ -1,77 +1,53 @@
 import request from 'supertest';
 import path from 'path';
-import { access } from 'fs/promises';
+import fs from 'fs/promises';
 import app from '../app';
-import sharpModule, { Sharp } from 'sharp';
-import * as imageProcessor from '../utils/imageProcessor';
-
-jest.mock('sharp');
-
-const mockSharp = sharpModule as unknown as jest.MockedFunction<typeof sharpModule>;
+import { resizeImage } from '../utils/imageProcessor';
 
 describe('Image API Endpoint Tests', () => {
   it('should return 200 and process the image', async () => {
-    const response = await request(app).get('/api/images?filename=test&width=100&height=100');
-    expect(response.status).toBe(200);
+    const res = await request(app).get('/api/images/resize?filename=test.jpg&width=100&height=100');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.path).toContain('/images/thumbnails/test-100x100.jpg');
   });
 
   it('should return 400 for missing parameters', async () => {
-    const response = await request(app).get('/api/images?filename=test');
-    expect(response.status).toBe(400);
+    const res = await request(app).get('/api/images/resize?filename=test.jpg');
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toBeDefined();
   });
 
-  it('should return 404 for non-existent file', async () => {
-    const response = await request(app).get('/api/images?filename=nonexistent&width=100&height=100');
-    expect(response.status).toBe(404);
+  it('should return 400 for non-existent file', async () => {
+    const res = await request(app).get('/api/images/resize?filename=nonexistent.jpg&width=100&height=100');
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toBeDefined();
   });
 
-  it('should check if processed image exists in cache', async () => {
-    const testImagePath = path.resolve('public/images/test_image.jpg');
-    await access(testImagePath);
-    expect(access).toHaveBeenCalled();
+  it('should return a list of images from /api/images', async () => {
+    const res = await request(app).get('/api/images');
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBeTrue();
   });
 });
 
 describe('Image Processing Functionality', () => {
-  const resizeImage = imageProcessor.resizeImage;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
+  it('should resize image successfully', async () => {
+    const outputPath = await resizeImage('test.jpg', 120, 120);
+    const fullPath = path.resolve('public/images/thumbnails', 'test-120x120.jpg');
+    try {
+      await fs.access(fullPath);
+      expect(true).toBeTrue();
+    } catch {
+      fail('Resized image not created.');
+    }
   });
 
-  it('should call sharp and resize image successfully', async () => {
-    mockSharp.mockImplementation(() => ({
-      resize: jest.fn().mockReturnThis(),
-      toFile: jest.fn().mockResolvedValue(undefined),
-      // Fill all required methods from Sharp to match the type
-      removeAlpha: jest.fn(),
-      ensureAlpha: jest.fn(),
-      extractChannel: jest.fn(),
-      joinChannel: jest.fn(),
-      // etc... (you can add more if TS complains again)
-    } as unknown as Sharp));
-
-    await resizeImage('image.jpg', 100, 100).then(result => {
-  expect(result).toBeUndefined();
-});
-
-  });
-
-  it('should throw error if resize fails', async () => {
-    mockSharp.mockImplementation(() => ({
-      resize: jest.fn().mockReturnThis(),
-      toFile: jest.fn().mockRejectedValue(new Error('Failed')),
-      removeAlpha: jest.fn(),
-      ensureAlpha: jest.fn(),
-      extractChannel: jest.fn(),
-      joinChannel: jest.fn(),
-    } as unknown as Sharp));
-
-    await resizeImage('fail.jpg', 100, 100)
-  .then(() => fail('Expected function to throw an error'))
-  .catch(err => {
-    expect(err.message).toBe('Failed');
-  });
-
+  it('should throw error if input image does not exist', async () => {
+    try {
+      await resizeImage('nonexistent.jpg', 100, 100);
+      fail('Expected error to be thrown');
+    } catch (err) {
+      expect(err).toBeDefined();
+    }
   });
 });

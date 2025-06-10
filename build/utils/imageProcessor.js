@@ -23,18 +23,19 @@ const resizeImage = (filename, width, height) => __awaiter(void 0, void 0, void 
     const thumbPath = path_1.default.join(thumbDirectory, `${baseFilename}-${width}x${height}.jpg`);
     try {
         yield fs_1.default.promises.access(thumbPath);
-        return thumbPath;
+        return thumbPath; // ✅ Return cached image
     }
     catch (_a) {
         try {
             if (!fs_1.default.existsSync(thumbDirectory)) {
                 yield fs_1.default.promises.mkdir(thumbDirectory, { recursive: true });
             }
-            yield (0, sharp_1.default)(originalImagePath).resize(width, height).toFile(thumbPath);
+            yield (0, sharp_1.default)(originalImagePath)
+                .resize(width, height)
+                .toFile(thumbPath);
             return thumbPath;
         }
-        catch ( // ✅ THE FIX IS HERE: The unused '_resizeError' variable is removed.
-        _b) { // ✅ THE FIX IS HERE: The unused '_resizeError' variable is removed.
+        catch (_b) {
             throw new Error('Image could not be processed or the original file does not exist.');
         }
     }

@@ -40,12 +40,7 @@ const express_1 = __importDefault(require("express"));
 const uploadMiddleware_1 = __importDefault(require("../middleware/uploadMiddleware"));
 const imageController = __importStar(require("../controllers/imageController"));
 const router = express_1.default.Router();
-// This route is correct
 router.get('/', imageController.getImages);
-// This route is correct
 router.get('/resize', imageController.handleResizeRequest);
-// POST /api/images/upload - Uploads a new image
-// ✅ THIS IS THE CORRECTED LINE
-// We now use uploadMiddleware.single('image') and imageController.handleUpload
 router.post('/upload', uploadMiddleware_1.default.single('image'), imageController.handleUpload);
 exports.default = router;
