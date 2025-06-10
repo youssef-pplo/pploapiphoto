@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Resizer</title>
+  <!-- <link rel="stylesheet" href="./style.css" /> -->
+</head>
+
+
+
+
+<body>
+  <h1>Image Resizer</h1>
+  <!-- <div id="image-gallery"></div> -->
+  <div class="control-group">
+  <label for="image-select">Select Image:</label>
+  <select id="image-select">
+    <option value="">-- Select an image --</option>
+  </select>
+</div>
+
+
+<div id="upload-preview" style="margin:10px; display:none;">
+  <h3>Selected Image Preview</h3>
+  <img id="preview-img" style="max-width:200px;">
+  <p id="upload-status"></p>
+</div>
+
+
+
+  <br />
+  <div>
+    <label for="width">Width:</label>
+    <input type="number" id="width" placeholder="Width" />
+  </div>
+  <div>
+    <label for="height">Height:</label>
+    <input type="number" id="height" placeholder="Height" />
+  </div>
+  <button id="resize-button">Resize Image</button>
+  <br /><br />
+  <input type="file" id="upload-input" accept="image/jpeg" />
+  <button id="upload-button">Upload Image</button>
+
+ 
+
+  <!-- <script src="/public/script.js"></script> -->
+  <script>
+    window.onload = function () {
+      fetchImages(); // Fetch images when the page loads
+    };
+
+
+
+document.getElementById('upload-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  const preview = document.getElementById('upload-preview');
+  const img = document.getElementById('preview-img');
+  
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      img.src = e.target.result;
+      preview.style.display = 'block';
+      document.getElementById('upload-status').textContent = `Selected: ${file.name}`;
+    }
+    reader.readAsDataURL(file);
+  }
+});
+
+
+document.getElementById('upload-button').addEventListener('click', function() {
+  const fileInput = document.getElementById('upload-input');
+  const status = document.getElementById('upload-status');
+  const file = fileInput.files[0];
+  
+  if (!file) {
+    status.textContent = 'Please select a file first';
+    status.style.color = 'red';
+    return;
+  }
+
+  status.textContent = 'Uploading...';
+  status.style.color = 'blue';
+
+  const formData = new FormData();
+  formData.append('image', file); // 'image' matches your multer config
+
+  fetch('/api/images/upload', {  // Matches your route
+    method: 'POST',
+    body: formData
+  })
+  .then(response => {
+  if (!response.ok) throw new Error(`Server error: ${response.status}`);
+  return response.json();
+})
+.then(data => {
+     console.log('UPLOAD RESPONSE DATA:', data); 
+    if (data.filename) {
+      status.textContent = 'Upload successful!';
+      status.style.color = 'green';
+      fetchImages(); // Refresh dropdown
+      fileInput.value = ''; // Clear input
+      document.getElementById('upload-preview').style.display = 'none';
+    } else {
+      throw new Error(data.error || 'Upload failed');
+    }
+  })
+  .catch(error => {
+    console.error('Upload error:', error);
+    status.textContent = 'Error: ' + error.message;
+    status.style.color = 'red';
+  });
+});
+
+
+
+    let selectedImage = '';
+
+    // Fetch images and display them in the gallery..................
+    // function fetchImages() {
+    //   fetch('/api/images')
+    //     .then((response) => response.json())
+    //     .then((images) => {
+    //       const gallery = document.getElementById('image-gallery');
+    //       gallery.innerHTML = ''; 
+
+    //       images.forEach((image) => {
+    //         const imgElement = document.createElement('img');
+    //         imgElement.src = `/images/${image}`; // For original images
+    //         // Correct image path
+    //         imgElement.alt = image;
+    //         imgElement.width = 100; // Thumbnail size
+    //         imgElement.classList.add('thumbnail');
+
+    //         imgElement.addEventListener('click', () => {
+    //           selectImageForResize(image, imgElement); // Select image for resizing
+    //         });
+
+    //         gallery.appendChild(imgElement); // Add the image to the gallery
+    //       });
+    //     })
+    //     .catch((error) => console.error('Error fetching images:', error));
+    // }
+// ...................
+
+
+
+
+function fetchImages() {
+  fetch('/api/images')
+    .then((response)=> {
+      console.log('IMAGE LIST RAW RESPONSE:', response);  
+      return response.json();
+    })
+    .then((images) => {
+      const dropdown = document.getElementById('image-select');
+      dropdown.innerHTML = '<option value="">-- Select an image --</option>';
+      
+      images.forEach((image) => {
+        const option = document.createElement('option');
+        option.value = image;
+        option.textContent = image;
+        dropdown.appendChild(option);
+      });
+    })
+    .catch((error) => console.error('Error fetching images:', error));
+}
+
+    // Store selected image for resizing
+    // function selectImageForResize(image, imgElement) {
+    //   selectedImage = image; // Set the selected image
+    //   console.log(`Selected Image: ${image}`);
+
+    //   // Optionally, highlight the selected image for user feedback
+    //   const gallery = document.getElementById('image-gallery');
+    //   const images = gallery.querySelectorAll('.thumbnail');
+    //   images.forEach((img) => img.classList.remove('selected')); // Remove selection from other images
+    //   imgElement.classList.add('selected'); // Add 'selected' class to the clicked image
+    // }
+// .......................................................
+
+document.getElementById('image-select').addEventListener('change', function() {
+  selectedImage = this.value;
+  console.log(`Selected Image: ${selectedImage}`);
+});
+
+
+    // Resize the selected image
+    document.getElementById('resize-button').addEventListener('click', function () {
+      const width = document.getElementById('width').value;
+      const height = document.getElementById('height').value;
+
+      if (selectedImage && width && height) {
+        // let firstDot = selectedImage.indexOf('.');
+        // selectedImage = selectedImage.substring(0, firstDot);
+        // console.log(selectedImage);
+        
+        fetch(
+          `/api/images/resize?filename=${selectedImage}&width=${width}&height=${height}`
+        )
+          .then((response) => response.json()) // Expecting the image blob in the response
+          .then((data) => {
+            // Create a URL from the blob and append the resized image to the page const oldImages = document.querySelectorAll('.resized-image');
+            const oldImages = document.querySelectorAll('.resized-image');
+    oldImages.forEach(img => img.remove());
+            
+            const imgElement = document.createElement('img');
+            imgElement.src = data.path; // Set the resized image URL
+            imgElement.alt = selectedImage;
+            imgElement.style.maxWidth = '100%'; // Display resized image with thumbnail size
+            imgElement.style.height = 'auto';
+
+            document.body.appendChild(imgElement); // Append the image to the body
+
+
+            const container = document.createElement('div');
+  container.style.margin = '20px';
+  container.appendChild(imgElement);
+  document.body.appendChild(container);
+          })
+          .catch((error) => console.error('Error resizing image:', error));
+      } else {
+        alert('Please select an image and specify width and height.');
+      }
+    });
+
+    // Image upload functionality
+    // Resize the selected image
+    
+
+  </script>
+</body>
+
+<style>
+  body {
+    background-color: rgb(177, 163, 163);
+    font-family: Arial, sans-serif;
+    text-align: center;
+  }
+
+  /* #image-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  } */
+
+  /* #image-gallery img {
+    width: 200px;
+    height: 200px;
+    margin: 10px;
+    border-radius: 8px;
+    object-fit: cover;
+  } */
+
+  .resized-image {
+  margin: 20px auto;
+  display: block;
+  max-width: 90%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+  .thumbnail {
+    margin: 5px;
+    cursor: pointer;
+  }
+/* 
+  .selected {
+    border: 2px solid blue;
+    
+  } */
+
+  .control-group {
+  margin: 15px 0;
+}
+
+label {
+  display: inline-block;
+  width: 120px;
+  font-weight: bold;
+}
+
+select {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  min-width: 200px;
+}
+
+  
+</style>
+
+</html>
