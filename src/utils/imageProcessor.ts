@@ -1,3 +1,4 @@
+
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
@@ -7,20 +8,34 @@ export const resizeImage = async (
   width: number,
   height: number
 ): Promise<string> => {
-  const inputPath = path.resolve('public/full', `${filename}.jpg`);
-  const outputDir = path.resolve('public/thumb');
-  const outputPath = path.resolve(outputDir, `${filename}_${width}x${height}.jpg`);
+  const originalImagePath = path.resolve(
+    __dirname,
+    `../../public/images/${filename}`
+  );
+  const thumbDirectory = path.resolve(
+    __dirname,
+    '../../public/images/thumbnails'
+  );
+  const baseFilename = path.parse(filename).name;
+  const thumbPath = path.join(
+    thumbDirectory,
+    `${baseFilename}-${width}x${height}.jpg`
+  );
 
-  // Make sure output folder exists
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir);
+  try {
+    await fs.promises.access(thumbPath);
+    return thumbPath;
+  } catch {
+    try {
+      if (!fs.existsSync(thumbDirectory)) {
+        await fs.promises.mkdir(thumbDirectory, { recursive: true });
+      }
+      await sharp(originalImagePath).resize(width, height).toFile(thumbPath);
+      return thumbPath;
+    } catch { // ✅ THE FIX IS HERE: The unused '_resizeError' variable is removed.
+      throw new Error(
+        'Image could not be processed or the original file does not exist.'
+      );
+    }
   }
-
-  // If already exists, return the path (for caching)
-  if (fs.existsSync(outputPath)) {
-    return outputPath;
-  }
-
-  await sharp(inputPath).resize(width, height).toFile(outputPath);
-  return outputPath;
 };

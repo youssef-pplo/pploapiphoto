@@ -1,43 +1,42 @@
+
 import { Request, Response } from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
-// LOGIC TO RESIZE AN IMAGE WITH CACHING
+const IMAGES_DIR_ORIGINAL = path.resolve(__dirname, '../../public/images');
+const IMAGES_DIR_THUMB = path.resolve(__dirname, '../../public/images/thumbnails');
+
+const ensureDirExists = async (dirPath: string): Promise<void> => {
+    try {
+        await fs.access(dirPath);
+    } catch {
+        await fs.mkdir(dirPath, { recursive: true });
+    }
+};
+
 const resizeImage = async (
   filename: string,
   width: number,
   height: number
 ): Promise<string> => {
-  const originalImagePath = path.resolve(
-    __dirname,
-    `../../public/images/${filename}`
-  );
-  const thumbDirectory = path.resolve(__dirname, '../../public/images/thumbnails');
-  const baseFilename = path.parse(filename).name;
-  const thumbPath = path.join(thumbDirectory, `${baseFilename}-${width}x${height}.jpg`);
-
-  // --- DEBUG MESSAGES ADDED BELOW ---
-
-  console.log(`[DEBUG] Checking for cached file at: ${thumbPath}`);
+  const originalImagePath = path.join(IMAGES_DIR_ORIGINAL, filename);
+  const thumbPath = path.join(IMAGES_DIR_THUMB, `${path.parse(filename).name}-${width}x${height}.jpg`);
 
   try {
     await fs.access(thumbPath);
-    console.log('[DEBUG] CACHE HIT! Found existing file.');
-    return `/images/thumbnails/${baseFilename}-${width}x${height}.jpg`;
+    return `/images/thumbnails/${path.basename(thumbPath)}`;
   } catch {
-    console.log('[DEBUG] CACHE MISS. Creating new file...');
     try {
+      await ensureDirExists(IMAGES_DIR_THUMB);
       await sharp(originalImagePath).resize(width, height).toFile(thumbPath);
-      return `/images/thumbnails/${baseFilename}-${width}x${height}.jpg`;
-    } catch (resizeError) {
-      console.log('[DEBUG] Error during image resize:', resizeError);
-      throw new Error('Image could not be processed or the original file does not exist.');
+      return `/images/thumbnails/${path.basename(thumbPath)}`;
+    } catch { // ✅ THE FIX IS HERE: The unused 'resizeError' variable is removed.
+      throw new Error('Image could not be processed. The original file may not exist.');
     }
   }
 };
 
-// CONTROLLER TO HANDLE THE /resize REQUEST
 export const handleResizeRequest = async (req: Request, res: Response): Promise<void> => {
   const { filename, width, height } = req.query;
 
@@ -45,7 +44,6 @@ export const handleResizeRequest = async (req: Request, res: Response): Promise<
     res.status(400).json({ error: 'Missing parameters. Please provide filename, width, and height.' });
     return;
   }
-
   const widthNum = parseInt(width as string);
   const heightNum = parseInt(height as string);
 
@@ -62,16 +60,32 @@ export const handleResizeRequest = async (req: Request, res: Response): Promise<
   }
 };
 
-// CONTROLLER TO GET THE LIST OF AVAILABLE IMAGES
 export const getImages = async (req: Request, res: Response): Promise<void> => {
-  const imagesDirectory = path.resolve(__dirname, '../../public/images');
   try {
-    const files = await fs.readdir(imagesDirectory);
-    const imageFiles = files.filter(
-      (file) => file.endsWith('.jpg') || file.endsWith('.jpeg')
-    );
+    await ensureDirExists(IMAGES_DIR_ORIGINAL);
+    const filesAndFolders = await fs.readdir(IMAGES_DIR_ORIGINAL);
+    
+    const imageFiles = [];
+    for (const file of filesAndFolders) {
+        const stats = await fs.stat(path.join(IMAGES_DIR_ORIGINAL, file));
+        if (stats.isFile() && /\.(jpg|jpeg|png)$/i.test(file)) {
+            imageFiles.push(file);
+        }
+    }
+    
     res.json(imageFiles);
   } catch {
     res.status(500).json({ error: 'Could not read images directory.' });
   }
+};
+
+export const handleUpload = (req: Request, res: Response): void => {
+    if (!req.file) {
+        res.status(400).json({ error: 'File not provided or was filtered.' });
+        return;
+    }
+    res.status(200).json({
+        message: 'Image uploaded successfully!',
+        filename: req.file.filename
+    });
 };

@@ -17,7 +17,7 @@ app.get('/', (req: Request, res: Response): void => {
 });
 
 app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
+  // The console.log message is removed to satisfy the linter.
+  // The server will still run correctly.
 });
-
 export default app;
